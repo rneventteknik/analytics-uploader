@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "analytics-uploader"
+readme = "README.md"
+dependencies = ["dotenv"]
+dynamic = ["version"]
+
+[project.scripts]
+analytics-uploader = "analytics_uploader"
+
+

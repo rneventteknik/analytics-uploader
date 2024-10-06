@@ -30,7 +30,7 @@ def fetch_backstage2_raw_data() -> str:
 
 def push_data_to_big_query(data: str):
     credentials_path = (
-        sys.argv[1] if sys.argv[1] is not None else DEFAULT_CREDENTIALS_PATH
+        sys.argv.get(1) if sys.argv[1] is not None else DEFAULT_CREDENTIALS_PATH
     )
     credentials = service_account.Credentials.from_service_account_file(
         credentials_path

@@ -5,10 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "analytics-uploader"
 readme = "README.md"
-dependencies = ["dotenv"]
+dependencies = [
+    "python-dotenv",
+    "httpx",
+    "google-cloud-bigquery",
+    "google-auth",
+    "google-auth-oauthlib",
+    "google-auth-httplib2",
+]
 dynamic = ["version"]
 
 [project.scripts]
-analytics-uploader = "analytics_uploader"
-
-
+analytics-uploader = "analytics_uploader:run_data_pipeline"

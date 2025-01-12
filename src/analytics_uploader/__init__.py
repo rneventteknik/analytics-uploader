@@ -8,28 +8,30 @@ import sys
 
 dotenv.load_dotenv()
 
-BACKSTAGE2_ENDPOINT = (
-    "https://stage.rneventteknik.se/api/external/v1/analytics/bookings"
+BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX = (
+    "https://stage.rneventteknik.se/api/external/v1/analytics/"
 )
-BIG_QUERY_TABLE_ID = "rn-admin-391316.raw_backstage2.booking"
+BIG_QUERY_DATASET_ID = "rn-admin-391316.raw_backstage2"
 DEFAULT_CREDENTIALS_PATH = "credentials.json"
 
 
 def run_data_pipeline():
-    data = fetch_backstage2_raw_data()
-    push_data_to_big_query(data)
+    booking_data = fetch_backstage2_raw_data(BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings")
+    equipment_usage_data = fetch_backstage2_raw_data(BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage")
+    push_data_to_big_query(booking_data, "booking")
+    push_data_to_big_query(equipment_usage_data, "equipmentUsage")
 
 
-def fetch_backstage2_raw_data() -> str:
+def fetch_backstage2_raw_data(endpoint: str) -> str:
     with httpx.Client() as client:
         response = client.get(
-            BACKSTAGE2_ENDPOINT, headers={"X-API-KEY": os.environ["BACKSTAGE2_API_KEY"]}
+            endpoint, headers={"X-API-KEY": os.environ["BACKSTAGE2_API_KEY"]}
         )
     return response.content
 
 
-def push_data_to_big_query(data: str):
-
+def push_data_to_big_query(data: str, table_name: str):
+    table_id = f"{BIG_QUERY_DATASET_ID}.{table_name}"
     credentials_path = (
         sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_CREDENTIALS_PATH
     )
@@ -40,10 +42,10 @@ def push_data_to_big_query(data: str):
 
     # Check if the table exists
     try:
-        client.get_table(BIG_QUERY_TABLE_ID)
-        print(f"Table {BIG_QUERY_TABLE_ID} already exists.")
+        client.get_table(table_id)
+        print(f"Table {table_id} already exists.")
     except Exception:
-        print(f"Table {BIG_QUERY_TABLE_ID} does not exist. Creating table...")
+        print(f"Table {table_id} does not exist. Creating table...")
 
         job_config = bigquery.LoadJobConfig(
             autodetect=True,  # Infer schema
@@ -53,10 +55,10 @@ def push_data_to_big_query(data: str):
         )
         
         job = client.load_table_from_file(
-            io.BytesIO(data), BIG_QUERY_TABLE_ID, job_config=job_config
+            io.BytesIO(data), table_id, job_config=job_config
         )
         job.result()  # Wait for the table creation to complete
-        print(f"Table {BIG_QUERY_TABLE_ID} created successfully.")
+        print(f"Table {table_id} created successfully.")
 
     # Load data into the table
     job_config = bigquery.LoadJobConfig(
@@ -66,13 +68,13 @@ def push_data_to_big_query(data: str):
         skip_leading_rows=1,
     )
     job = client.load_table_from_file(
-        io.BytesIO(data), BIG_QUERY_TABLE_ID, job_config=job_config
+        io.BytesIO(data), table_id, job_config=job_config
     )
     job.result()  # Wait for the job to complete
 
-    table = client.get_table(BIG_QUERY_TABLE_ID)  # Fetch the updated table
+    table_name = client.get_table(table_id)  # Fetch the updated table
     print(
         "Loaded {} rows and {} columns to {}".format(
-            table.num_rows, len(table.schema), BIG_QUERY_TABLE_ID
+            table_name.num_rows, len(table_name.schema), table_id
         )
     )

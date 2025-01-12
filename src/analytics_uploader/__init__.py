@@ -38,6 +38,27 @@ def push_data_to_big_query(data: str):
     )
     client = bigquery.Client(credentials=credentials)
 
+    # Check if the table exists
+    try:
+        client.get_table(BIG_QUERY_TABLE_ID)
+        print(f"Table {BIG_QUERY_TABLE_ID} already exists.")
+    except Exception:
+        print(f"Table {BIG_QUERY_TABLE_ID} does not exist. Creating table...")
+
+        job_config = bigquery.LoadJobConfig(
+            autodetect=True,  # Infer schema
+            source_format=bigquery.SourceFormat.CSV,
+            field_delimiter=",",
+            skip_leading_rows=1,
+        )
+        
+        job = client.load_table_from_file(
+            io.BytesIO(data), BIG_QUERY_TABLE_ID, job_config=job_config
+        )
+        job.result()  # Wait for the table creation to complete
+        print(f"Table {BIG_QUERY_TABLE_ID} created successfully.")
+
+    # Load data into the table
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         source_format=bigquery.SourceFormat.CSV,
@@ -47,10 +68,9 @@ def push_data_to_big_query(data: str):
     job = client.load_table_from_file(
         io.BytesIO(data), BIG_QUERY_TABLE_ID, job_config=job_config
     )
+    job.result()  # Wait for the job to complete
 
-    job.result()  # Waits for the job to complete.
-
-    table = client.get_table(BIG_QUERY_TABLE_ID)  # Make an API request.
+    table = client.get_table(BIG_QUERY_TABLE_ID)  # Fetch the updated table
     print(
         "Loaded {} rows and {} columns to {}".format(
             table.num_rows, len(table.schema), BIG_QUERY_TABLE_ID

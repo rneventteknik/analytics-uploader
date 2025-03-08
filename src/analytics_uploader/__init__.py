@@ -18,8 +18,10 @@ DEFAULT_CREDENTIALS_PATH = "credentials.json"
 def run_data_pipeline():
     booking_data = fetch_backstage2_raw_data(BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings")
     equipment_usage_data = fetch_backstage2_raw_data(BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage")
+    time_report_data = fetch_backstage2_raw_data(BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports")
     push_data_to_big_query(booking_data, "booking")
     push_data_to_big_query(equipment_usage_data, "equipmentUsage")
+    push_data_to_big_query(time_report_data, "timeReport")
 
 
 def fetch_backstage2_raw_data(endpoint: str) -> str:

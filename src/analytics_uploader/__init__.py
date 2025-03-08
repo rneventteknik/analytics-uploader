@@ -25,6 +25,7 @@ def run_data_pipeline():
 
 
 def fetch_backstage2_raw_data(endpoint: str) -> str:
+    print(f"Fetching data from endpoint: {endpoint}")
     with httpx.Client() as client:
         response = client.get(
             endpoint, headers={"X-API-KEY": os.environ["BACKSTAGE2_API_KEY"]}

@@ -7,7 +7,6 @@ import os
 from google.cloud import bigquery  # type: ignore
 from google.oauth2 import service_account
 import io
-import sys
 
 dotenv.load_dotenv()
 
@@ -70,14 +69,10 @@ def process_dataset(client: bigquery.Client, dataset_name: str, dataset_path: st
 
 
 def initialize_views(credentials_path: str, sql_directory_path: str):
-    credentials_path = sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_CREDENTIALS_PATH
     credentials = service_account.Credentials.from_service_account_file(  # type: ignore
         credentials_path
     )
     client = bigquery.Client(credentials=credentials)
-
-    # Get the base directory (where src and sql folders are)
-    sql_directory_path = sys.argv[2] if len(sys.argv) >= 3 else DEFAULT_SQL_DIRECTORY
     if not os.path.exists(sql_directory_path):
         print(f"No SQL directory found at {sql_directory_path}")
         return
@@ -101,7 +96,6 @@ def fetch_backstage2_raw_data(endpoint: str) -> bytes:
 
 def push_data_to_big_query(data: bytes, table_name: str, credentials_path: str):
     table_id = f"{BIG_QUERY_DATASET_ID}.{table_name}"
-    credentials_path = sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_CREDENTIALS_PATH
     credentials = service_account.Credentials.from_service_account_file(  # type: ignore
         credentials_path
     )

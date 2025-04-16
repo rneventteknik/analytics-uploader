@@ -6,7 +6,7 @@ if ! [ -f "$(which pip3)" ] ; then
 fi
 
 # Install analytics-upload with pip3
-pip3 install --break-system-packages analytics-uploader
+pip3 install --break-system-packages --force-reinstall "$(dirname "$0")/../../analytics-uploader"
 
 # Stop any existing services
 echo "Stopping old services..."
@@ -20,6 +20,7 @@ rm -v /lib/systemd/system/rn.analytics-uploader.timer
 
 # Copy files
 echo "Copying files..."
+cd "$(dirname "$0")"
 cp -v rn.analytics-uploader.service /lib/systemd/system/
 cp -v rn.analytics-uploader.timer /lib/systemd/system/
 

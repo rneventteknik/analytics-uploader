@@ -1,4 +1,4 @@
-from analytics_uploader import run_data_pipeline
+from analytics_uploader import main
 
 if __name__ == "__main__":
-    run_data_pipeline()
+    main()

@@ -16,5 +16,4 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
-analytics-uploader = "analytics_uploader:run_data_pipeline"
-initialize-views = "analytics_uploader:initialize_views"
+analytics-uploader = "analytics_uploader:main"

@@ -1,3 +1,6 @@
+"""Upload analytics data to BigQuery and initialize views."""
+
+import argparse
 import httpx
 import dotenv
 import os
@@ -66,7 +69,7 @@ def process_dataset(client: bigquery.Client, dataset_name: str, dataset_path: st
         process_sql_file(client, dataset_path, sql_file, dataset_id)
 
 
-def initialize_views():
+def initialize_views(credentials_path: str, sql_directory_path: str):
     credentials_path = sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_CREDENTIALS_PATH
     credentials = service_account.Credentials.from_service_account_file(  # type: ignore
         credentials_path
@@ -96,7 +99,7 @@ def fetch_backstage2_raw_data(endpoint: str) -> bytes:
     return response.content
 
 
-def push_data_to_big_query(data: bytes, table_name: str):
+def push_data_to_big_query(data: bytes, table_name: str, credentials_path: str):
     table_id = f"{BIG_QUERY_DATASET_ID}.{table_name}"
     credentials_path = sys.argv[1] if len(sys.argv) >= 2 else DEFAULT_CREDENTIALS_PATH
     credentials = service_account.Credentials.from_service_account_file(  # type: ignore
@@ -138,13 +141,13 @@ def push_data_to_big_query(data: bytes, table_name: str):
     print(
         "Loaded {} rows and {} columns to {}".format(
             existing_table.num_rows,
-            len(existing_table.schema), # type: ignore
+            len(existing_table.schema),  # type: ignore
             table_id,
         )
     )
 
 
-def run_data_pipeline():
+def run_data_pipeline(credentials_path: str, sql_directory: str):
     booking_data = fetch_backstage2_raw_data(
         BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings"
     )
@@ -154,7 +157,31 @@ def run_data_pipeline():
     time_report_data = fetch_backstage2_raw_data(
         BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports"
     )
-    push_data_to_big_query(booking_data, "booking")
-    push_data_to_big_query(equipment_usage_data, "equipmentUsage")
-    push_data_to_big_query(time_report_data, "timeReport")
-    initialize_views()
+    push_data_to_big_query(booking_data, "booking", credentials_path)
+    push_data_to_big_query(equipment_usage_data, "equipmentUsage", credentials_path)
+    push_data_to_big_query(time_report_data, "timeReport", credentials_path)
+    initialize_views(credentials_path, sql_directory)
+
+
+def main():
+    argparser = argparse.ArgumentParser(
+        description=__doc__
+    )
+    argparser.add_argument(
+        "-c",
+        "--credentials",
+        type=str,
+        help="Path to the credentials JSON file.",
+        default=DEFAULT_CREDENTIALS_PATH,
+    )
+    argparser.add_argument(
+        "-s",
+        "--sql-directory",
+        type=str,
+        help="Path to the directory with SQL files to initialize view."
+        " Should contain subfolders for each dataset and the filenames"
+        " should be on the format <initiation order index>_<SQL view name>.sql.",
+        default=DEFAULT_SQL_DIRECTORY,
+    )
+    args = argparser.parse_args()
+    run_data_pipeline(args.credentials, args.sql_directory)

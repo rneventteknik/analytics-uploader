@@ -1,10 +1,7 @@
 credentials.json
 
-# Created by https://www.toptal.com/developers/gitignore/api/python,macos,windows,linux
-# Edit at https://www.toptal.com/developers/gitignore?templates=python,macos,windows,linux
-
-# Koskis venv
-rn
+# Created by https://www.toptal.com/developers/gitignore/api/linux,macos,python,windows,visualstudiocode
+# Edit at https://www.toptal.com/developers/gitignore?templates=linux,macos,python,windows,visualstudiocode
 
 ### Linux ###
 *~
@@ -226,6 +223,25 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+### VisualStudioCode ###
+.vscode/*
+# !.vscode/settings.json
+# !.vscode/tasks.json
+# !.vscode/launch.json
+# !.vscode/extensions.json
+# !.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+.ionide
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
@@ -252,4 +268,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/python,macos,windows,linux
+# End of https://www.toptal.com/developers/gitignore/api/linux,macos,python,windows,visualstudiocode

@@ -1,0 +1,16 @@
+[Unit]
+Description="A service that downloads Backstage2 data and uploads it to Google BigQuery daily."
+After=multi-user.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=/etc/environment
+ExecStart=/usr/local/bin/analytics-uploader -c /root/credentials.json -s /root/analytics-uploader/sql/
+StandardError=journal
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

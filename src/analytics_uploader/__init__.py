@@ -39,11 +39,14 @@ def process_sql_file(
 
         try:
             client.get_table(view_id)
-            print(f"Updating view {view_id}...")
+            print(f"Trying to update view {view_id}...")
             client.update_table(view, ["view_query"])
-        except Exception:
+            print(f"View {view_id} updated successfully.")
+        except Exception as e:
+            print(f"Error updating view {view_id}: {str(e)}")
             print(f"Creating view {view_id}...")
             client.create_table(view, exists_ok=True)
+            print(f"View {view_id} created successfully.")
 
     except Exception as e:
         print(f"Error creating/updating view {view_id}: {str(e)}")

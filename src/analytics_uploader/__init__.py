@@ -7,6 +7,7 @@ import os
 from google.cloud import bigquery  # type: ignore
 from google.oauth2 import service_account
 import io
+from googleapiclient.discovery import build
 
 dotenv.load_dotenv()
 
@@ -14,8 +15,10 @@ BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX = (
     "https://stage.rneventteknik.se/api/external/v1/analytics/"
 )
 BIG_QUERY_DATASET_ID = "rn-admin-391316.raw_backstage2"
+SPREADSHEET_DATASET_ID = "rn-admin-391316.raw_spreadsheet"
 DEFAULT_CREDENTIALS_PATH = "credentials.json"
 DEFAULT_SQL_DIRECTORY = "sql"
+SPREADSHEET_DIRECTORY_ID = "1ESgH00-XT6mniJg11wAhwN-LXyXHzEde"
 
 
 def process_sql_file(
@@ -97,8 +100,8 @@ def fetch_backstage2_raw_data(endpoint: str) -> bytes:
     return response.content
 
 
-def push_data_to_big_query(data: bytes, table_name: str, credentials_path: str):
-    table_id = f"{BIG_QUERY_DATASET_ID}.{table_name}"
+def push_data_to_big_query(data: bytes, dataset_id: str,  table_name: str, credentials_path: str):
+    table_id = f"{dataset_id}.{table_name}"
     credentials = service_account.Credentials.from_service_account_file(  # type: ignore
         credentials_path
     )
@@ -154,16 +157,70 @@ def run_data_pipeline(credentials_path: str, sql_directory: str):
     time_report_data = fetch_backstage2_raw_data(
         BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports"
     )
-    push_data_to_big_query(booking_data, "booking", credentials_path)
-    push_data_to_big_query(equipment_usage_data, "equipmentUsage", credentials_path)
-    push_data_to_big_query(time_report_data, "timeReport", credentials_path)
+    push_data_to_big_query(booking_data, BIG_QUERY_DATASET_ID, "booking", credentials_path)
+    push_data_to_big_query(equipment_usage_data, BIG_QUERY_DATASET_ID, "equipmentUsage", credentials_path)
+    push_data_to_big_query(time_report_data, BIG_QUERY_DATASET_ID, "timeReport", credentials_path)
+
+    sheets_data = list_and_export_sheets_csv(
+        SPREADSHEET_DIRECTORY_ID, credentials_path
+    )
+    for sheet_name, csv_data in sheets_data.items():
+        if csv_data is not None:
+            table_name = sheet_name.replace(" ", "_").lower()
+            push_data_to_big_query(csv_data, SPREADSHEET_DATASET_ID, table_name, credentials_path)
+
     initialize_views(credentials_path, sql_directory)
 
 
-def main():
-    argparser = argparse.ArgumentParser(
-        description=__doc__
+def list_and_export_sheets_csv(folder_id, credentials_path="credentials.json"):
+    """
+    Lists all Google Sheets in the specified Google Drive folder and exports the first sheet of each as CSV (bytes).
+    Args:
+        folder_id (str): The ID of the Google Drive folder.
+        credentials_path (str): Path to the service account credentials JSON file.
+    Returns:
+        dict: Mapping of spreadsheet name to its CSV content (as bytes).
+    """
+    print(f"Listing and exporting sheets from folder ID: {folder_id}")
+    SCOPES = [
+        "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
+    ]
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path, scopes=SCOPES
     )
+    drive_service = build("drive", "v3", credentials=credentials)
+    query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
+    results = (
+        drive_service.files()
+        .list(
+            q=query,
+            fields="files(id, name)",
+            includeItemsFromAllDrives=True,
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+    files = results.get("files", [])
+    csv_exports = {}
+    for file in files:
+        spreadsheet_id = file["id"]  # type: ignore
+        name = file["name"]  # type: ignore
+        print(f"Processing spreadsheet: {name} (ID: {spreadsheet_id})")
+        try:
+            # Export the first sheet as CSV (bytes)
+            request = drive_service.files().export(
+                fileId=spreadsheet_id, mimeType="text/csv"
+            )
+            csv_data = request.execute()
+            csv_exports[name] = csv_data  # Keep as bytes
+        except Exception:
+            csv_exports[name] = None
+    return csv_exports
+
+
+def main():
+    argparser = argparse.ArgumentParser(description=__doc__)
     argparser.add_argument(
         "-c",
         "--credentials",

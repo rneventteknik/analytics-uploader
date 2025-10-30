@@ -23,8 +23,8 @@ pip3 install -e .
 # Configure environment
 # Create .env file with:
 #   BACKSTAGE2_API_KEY=<your-key>
-#   SPREADSHEETS_FOLDER_ID=<google-drive-folder-id>
 # Add credentials.json (Google service account with drive.readonly, spreadsheets.readonly scopes)
+# Note: SPREADSHEET_DIRECTORY_ID is hardcoded in the source code (line 21 of __init__.py)
 ```
 
 ### Running Locally
@@ -39,7 +39,37 @@ analytics-uploader -c /path/to/credentials.json -s /path/to/sql/
 python -m analytics_uploader
 ```
 
-### Production Deployment
+### Running with Docker
+
+#### Docker Compose (Recommended)
+```bash
+# Build and run
+docker-compose up
+
+# Run in background
+docker-compose up -d
+```
+
+#### Docker CLI
+```bash
+# Build image
+docker build -t analytics-uploader .
+
+# Run container
+docker run \
+  -v ./credentials.json:/app/credentials.json:ro \
+  -e BACKSTAGE2_API_KEY="your-api-key" \
+  analytics-uploader \
+  -c /app/credentials.json -s /app/sql
+```
+
+**Important Notes:**
+- Credentials must be mounted to `/app/credentials.json` (appuser only has access to `/app` directory)
+- The container runs as non-root user `appuser` for security
+- SQL files are baked into the image at build time
+- Images are automatically built and published to GHCR on push to main branch
+
+### Production Deployment (Systemd)
 ```bash
 # Install as systemd service (Linux only, requires root)
 cd environment/
@@ -51,6 +81,13 @@ systemctl status rn.analytics-uploader.timer     # Check schedule
 journalctl -u rn.analytics-uploader.service      # View logs
 journalctl -u rn.analytics-uploader.service -f   # Follow logs
 ```
+
+### CI/CD
+- **GitHub Actions**: Automatically builds and publishes Docker images to GitHub Container Registry (GHCR)
+- **Trigger**: Push to `main` branch
+- **Image location**: `ghcr.io/<username>/analytics-uploader:latest`
+- **Build optimizations**: Uses uv cache and GitHub Actions cache for faster builds
+- **Multi-platform**: Builds for linux/amd64 and linux/arm64
 
 ### Testing
 ⚠️ **No testing infrastructure exists.** There are no test files, test runners, or CI/CD pipelines. Test changes manually before deploying.

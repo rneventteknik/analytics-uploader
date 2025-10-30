@@ -24,11 +24,12 @@ COPY src/ ./src/
 ENV PYTHONUNBUFFERED=1
 
 # Run as non-root user for security
-RUN adduser -D -u 1000 appuser && \
+RUN useradd appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
 # Default command runs analytics-uploader with SQL directory
-# Credentials expected as environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON
+# Mount credentials.json file and pass path via -c flag
+# Example: docker run -v ./credentials.json:/app/credentials.json:ro analytics-uploader -c /app/credentials.json
 ENTRYPOINT ["analytics-uploader"]
 CMD ["-s", "/app/sql"]

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  analytics-uploader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount Google service account credentials as read-only
+      - ./credentials.json:/app/credentials.json:ro
+    environment:
+      # Backstage2 API authentication
+      - BACKSTAGE2_API_KEY=${BACKSTAGE2_API_KEY}
+    command: ["-c", "/app/credentials.json"]
+    restart: "no"

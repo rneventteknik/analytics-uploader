@@ -36,18 +36,18 @@ docker run \
   -v ./credentials.json:/app/credentials.json:ro \
   -e BACKSTAGE2_API_KEY="your-api-key" \
   analytics-uploader \
-  -c /app/credentials.json -s /app/sql
+  -c /app/credentials.json
 ```
 
 ### Using Published Image from GHCR
 
 Pull from GitHub Container Registry:
 ```bash
-docker pull ghcr.io/<repository_owner>/analytics-uploader:latest
+docker pull ghcr.io/rneventteknik/analytics-uploader:latest
 
 docker run \
   -v ./credentials.json:/app/credentials.json:ro \
   -e BACKSTAGE2_API_KEY="your-api-key" \
-  ghcr.io/<repository_owner>/analytics-uploader:latest \
+  ghcr.io/rneventteknik/analytics-uploader:latest \
   -c /app/credentials.json -s /app/sql
 ```

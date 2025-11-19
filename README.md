@@ -10,6 +10,33 @@ Can be added to `.env` file.
 BACKSTAGE2_API_KEY={the api key}
 ```
 
+## Usage Examples
+
+Run the entire pipeline (uses `credentials.json` and `sql/` directory):
+```bash
+analytics-uploader
+```
+
+Run only Google Sheets data upload:
+```bash
+analytics-uploader --run-steps sheets
+```
+
+Run only Backstage2 data:
+```bash
+analytics-uploader --run-steps backstage
+```
+
+Run sheets and update views (skip Backstage2):
+```bash
+analytics-uploader --run-steps sheets views
+```
+
+Run all steps explicitly:
+```bash
+analytics-uploader --run-steps backstage sheets views
+```
+
 ## Running with Docker
 
 ### Using Docker Compose

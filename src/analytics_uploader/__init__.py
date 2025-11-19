@@ -147,29 +147,36 @@ def push_data_to_big_query(data: bytes, dataset_id: str,  table_name: str, crede
     )
 
 
-def run_data_pipeline(credentials_path: str, sql_directory: str):
-    booking_data = fetch_backstage2_raw_data(
-        BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings"
-    )
-    equipment_usage_data = fetch_backstage2_raw_data(
-        BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage"
-    )
-    time_report_data = fetch_backstage2_raw_data(
-        BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports"
-    )
-    push_data_to_big_query(booking_data, BIG_QUERY_DATASET_ID, "booking", credentials_path)
-    push_data_to_big_query(equipment_usage_data, BIG_QUERY_DATASET_ID, "equipmentUsage", credentials_path)
-    push_data_to_big_query(time_report_data, BIG_QUERY_DATASET_ID, "timeReport", credentials_path)
+def run_data_pipeline(credentials_path: str, sql_directory: str, run_steps: list[str] | None = None):
+    # Default to running all steps if none specified
+    if run_steps is None:
+        run_steps = ["backstage", "sheets", "views"]
 
-    sheets_data = list_and_export_sheets_csv(
-        SPREADSHEET_DIRECTORY_ID, credentials_path
-    )
-    for sheet_name, csv_data in sheets_data.items():
-        if csv_data is not None:
-            table_name = sheet_name.replace(" ", "_").lower()
-            push_data_to_big_query(csv_data, SPREADSHEET_DATASET_ID, table_name, credentials_path)
+    if "backstage" in run_steps:
+        booking_data = fetch_backstage2_raw_data(
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings"
+        )
+        equipment_usage_data = fetch_backstage2_raw_data(
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage"
+        )
+        time_report_data = fetch_backstage2_raw_data(
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports"
+        )
+        push_data_to_big_query(booking_data, BIG_QUERY_DATASET_ID, "booking", credentials_path)
+        push_data_to_big_query(equipment_usage_data, BIG_QUERY_DATASET_ID, "equipmentUsage", credentials_path)
+        push_data_to_big_query(time_report_data, BIG_QUERY_DATASET_ID, "timeReport", credentials_path)
 
-    initialize_views(credentials_path, sql_directory)
+    if "sheets" in run_steps:
+        sheets_data = list_and_export_sheets_csv(
+            SPREADSHEET_DIRECTORY_ID, credentials_path
+        )
+        for sheet_name, csv_data in sheets_data.items():
+            if csv_data is not None:
+                table_name = sheet_name.replace(" ", "_").lower()
+                push_data_to_big_query(csv_data, SPREADSHEET_DATASET_ID, table_name, credentials_path)
+
+    if "views" in run_steps:
+        initialize_views(credentials_path, sql_directory)
 
 
 def list_and_export_sheets_csv(folder_id, credentials_path="credentials.json"):
@@ -237,5 +244,12 @@ def main():
         " should be on the format <initiation order index>_<SQL view name>.sql.",
         default=DEFAULT_SQL_DIRECTORY,
     )
+    argparser.add_argument(
+        "--run-steps",
+        nargs="*",
+        choices=["backstage", "sheets", "views"],
+        help="Specify which pipeline steps to run. Options: backstage (Backstage2 data), "
+        "sheets (Google Sheets data), views (BigQuery views). If not specified, all steps run.",
+    )
     args = argparser.parse_args()
-    run_data_pipeline(args.credentials, args.sql_directory)
+    run_data_pipeline(args.credentials, args.sql_directory, args.run_steps)

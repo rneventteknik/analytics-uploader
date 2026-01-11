@@ -32,6 +32,7 @@ WITH revenue AS (
         and bookingStatus = 'Klar'
 )
 SELECT revenue.*,
-    booking.created as bookingCreated
+    booking.created as bookingCreated,
+    booking.usageStartDatetime as bookingUsageStartDatetime
 FROM revenue
     LEFT JOIN `rn-admin-391316.raw_backstage2.booking` AS booking ON revenue.bookingId = booking.id

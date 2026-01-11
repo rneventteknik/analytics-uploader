@@ -49,6 +49,7 @@ WITH revenue AS (
     FROM `rn-admin-391316.raw_backstage2.booking`
     WHERE fixedPrice is null
         and status != 'Inställd'
+        and accountKind is not null
 )
 SELECT revenue.*,
     booking.created as bookingCreated,

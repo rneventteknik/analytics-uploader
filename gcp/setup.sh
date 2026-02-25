@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time setup script for deploying analytics-uploader as a Cloud Run Job.
-# Run once as a project owner with gcloud authenticated to rn-admin-391316.
+# Run once as a project owner with gcloud authenticated.
 #
 # Prerequisites:
 #   - gcloud CLI installed and authenticated
@@ -16,7 +16,8 @@
 
 set -euo pipefail
 
-PROJECT=rn-admin-391316
+PROJECT=crafty-tractor-488623-j8
+BIGQUERY_PROJECT=rn-admin-391316
 REGION=europe-west1
 RUNNER_SA=analytics-uploader-runner@${PROJECT}.iam.gserviceaccount.com
 SCHEDULER_SA=analytics-uploader-scheduler@${PROJECT}.iam.gserviceaccount.com
@@ -67,10 +68,11 @@ gcloud iam service-accounts create analytics-uploader-runner \
   --display-name="Analytics Uploader - Runtime" \
   --project=${PROJECT}
 
-gcloud projects add-iam-policy-binding ${PROJECT} \
+# BigQuery access is on the BigQuery project, not the Cloud Run project
+gcloud projects add-iam-policy-binding ${BIGQUERY_PROJECT} \
   --member="serviceAccount:${RUNNER_SA}" \
   --role="roles/bigquery.dataEditor"
-gcloud projects add-iam-policy-binding ${PROJECT} \
+gcloud projects add-iam-policy-binding ${BIGQUERY_PROJECT} \
   --member="serviceAccount:${RUNNER_SA}" \
   --role="roles/bigquery.jobUser"
 
@@ -103,7 +105,7 @@ gcloud projects add-iam-policy-binding ${PROJECT} \
 
 echo "=== Section 4: Create Cloud Run Job ==="
 gcloud run jobs create analytics-uploader \
-  --image="ghcr.io/${GITHUB_OWNER}/analytics-uploader:latest" \
+  --image="europe-west1-docker.pkg.dev/${PROJECT}/ghcr-mirror/${GITHUB_OWNER}/analytics-uploader:latest" \
   --region=${REGION} \
   --service-account=${RUNNER_SA} \
   --set-secrets=BACKSTAGE2_API_KEY=backstage2-api-key:latest \

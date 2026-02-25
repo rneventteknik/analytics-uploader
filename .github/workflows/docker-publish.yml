@@ -54,6 +54,7 @@ jobs:
       - name: Update Cloud Run Job image
         run: |
           gcloud run jobs update analytics-uploader \
-            --image=ghcr.io/${{ github.repository_owner }}/analytics-uploader:latest \
+            --image=europe-west1-docker.pkg.dev/crafty-tractor-488623-j8/ghcr-mirror/${{ github.repository_owner }}/analytics-uploader:latest \
             --region=europe-west1 \
+            --project=crafty-tractor-488623-j8 \
             --quiet

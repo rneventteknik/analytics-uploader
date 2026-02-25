@@ -45,3 +45,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Update Cloud Run Job image
+        run: |
+          gcloud run jobs update analytics-uploader \
+            --image=ghcr.io/${{ github.repository_owner }}/analytics-uploader:latest \
+            --region=europe-west1 \
+            --quiet

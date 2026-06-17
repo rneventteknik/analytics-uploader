@@ -8,6 +8,8 @@ Can be added to `.env` file.
 
 ```
 BACKSTAGE2_API_KEY={the api key}
+# Optional. Defaults to the stage.rneventteknik.se analytics endpoint if unset.
+BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX={base analytics URL, ending in a slash}
 ```
 
 ## Usage Examples
@@ -15,6 +17,11 @@ BACKSTAGE2_API_KEY={the api key}
 Run the entire pipeline (uses `credentials.json` and `sql/` directory):
 ```bash
 analytics-uploader
+```
+
+With custom credentials and SQL directory:
+```bash
+analytics-uploader -c /path/to/credentials.json -s /path/to/sql
 ```
 
 Run only Google Sheets data upload:

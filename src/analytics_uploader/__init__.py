@@ -1,6 +1,8 @@
 """Upload analytics data to BigQuery and initialize views."""
 
 import argparse
+import csv
+import time
 import httpx
 import dotenv
 import os
@@ -11,14 +13,20 @@ from googleapiclient.discovery import build
 
 dotenv.load_dotenv()
 
-BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX = (
-    "https://stage.rneventteknik.se/api/external/v1/analytics/"
+BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX = os.environ.get(
+    "BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX",
+    "https://stage.rneventteknik.se/api/external/v1/analytics/",
 )
 BIG_QUERY_DATASET_ID = "rn-admin-391316.raw_backstage2"
 SPREADSHEET_DATASET_ID = "rn-admin-391316.raw_spreadsheet"
 DEFAULT_CREDENTIALS_PATH = "credentials.json"
 DEFAULT_SQL_DIRECTORY = "sql"
 SPREADSHEET_DIRECTORY_ID = "1ESgH00-XT6mniJg11wAhwN-LXyXHzEde"
+# Number of bookings to request per Backstage2 analytics page. The endpoints
+# paginate by booking; we page through all of them so this only controls request size.
+PAGE_SIZE = 100
+# Seconds to wait between successive page requests, to avoid loading the server.
+REQUEST_DELAY_SECONDS = 0.5
 
 
 def process_sql_file(
@@ -91,13 +99,91 @@ def initialize_views(credentials_path: str, sql_directory_path: str):
         process_dataset(client, dataset_name, dataset_path)
 
 
-def fetch_backstage2_raw_data(endpoint: str) -> bytes:
+def min_booking_id(csv_text: str, booking_id_column: str) -> int | None:
+    """Smallest booking id in a CSV page, resolved by header name (None if no ids).
+
+    Must be resolved by name, not position: for `equipmentUsage`/`timeReports` the first
+    column is the entry id, not the booking id.
+    """
+    reader = csv.DictReader(io.StringIO(csv_text))
+    ids = (int(row[booking_id_column]) for row in reader if row[booking_id_column])
+    return min(ids, default=None)
+
+
+def iter_backstage2_pages(
+    client: httpx.Client,
+    endpoint: str,
+    headers: dict[str, str],
+    booking_id_column: str,
+    page_size: int,
+):
+    """Yield non-empty CSV page bodies, walking backwards over every booking id.
+
+    The endpoints paginate by booking via `pageSize`/`maxBookingId` and order rows by
+    booking id descending. Each step sets `maxBookingId = (smallest id seen) - 1` to walk
+    from the newest booking to the oldest with no overlap and no gaps.
+    """
+    max_booking_id: int | None = None
+    while True:
+        params: dict[str, int] = {"pageSize": page_size}
+        if max_booking_id is not None:
+            params["maxBookingId"] = max_booking_id
+            # Throttle every request after the first to avoid loading the server.
+            time.sleep(REQUEST_DELAY_SECONDS)
+
+        response = client.get(endpoint, params=params, headers=headers)
+        response.raise_for_status()
+        text = response.text
+
+        # A page can return fewer rows than `page_size` -- the server applies the
+        # `pageSize` limit when querying the DB, then filters out internal-reservation
+        # bookings afterwards. So a page covers `page_size` booking ids but may yield
+        # fewer (or, if the whole window was internal reservations, zero) data rows.
+        if not text.strip():
+            # Empty page. A full window of bookings can be filtered out server-side even
+            # though older real bookings still exist, so keep walking down rather than
+            # stopping immediately (Option B). A first empty page means no data at all.
+            if max_booking_id is None:
+                return
+            max_booking_id -= page_size
+            if max_booking_id < 1:
+                return
+            continue
+
+        yield text
+
+        smallest = min_booking_id(text, booking_id_column)
+        if smallest is None or smallest <= 1:
+            return
+        max_booking_id = smallest - 1
+
+
+def fetch_backstage2_raw_data(
+    endpoint: str, booking_id_column: str, page_size: int = PAGE_SIZE
+) -> bytes:
+    """Page through a paginated Backstage2 analytics endpoint and reassemble the full CSV.
+
+    Concatenates every page into a single CSV: the header is taken from the first page
+    only, then all data rows from every page are appended.
+    """
     print(f"Fetching data from endpoint: {endpoint}")
-    with httpx.Client() as client:
-        response = client.get(
-            endpoint, headers={"X-API-KEY": os.environ["BACKSTAGE2_API_KEY"]}
+    headers = {"X-API-KEY": os.environ["BACKSTAGE2_API_KEY"]}
+
+    with httpx.Client(timeout=120.0) as client:
+        pages = list(
+            iter_backstage2_pages(
+                client, endpoint, headers, booking_id_column, page_size
+            )
         )
-    return response.content
+
+    if not pages:
+        return b""
+
+    header_line = pages[0].splitlines()[0]
+    data_rows = [row for page in pages for row in page.splitlines()[1:]]
+
+    print(f"Fetched {len(data_rows)} data rows from endpoint: {endpoint}")
+    return "\r\n".join([header_line, *data_rows]).encode("utf-8")
 
 
 def push_data_to_big_query(data: bytes, dataset_id: str,  table_name: str, credentials_path: str):
@@ -154,13 +240,13 @@ def run_data_pipeline(credentials_path: str, sql_directory: str, run_steps: list
 
     if "backstage" in run_steps:
         booking_data = fetch_backstage2_raw_data(
-            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings"
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "bookings", "id"
         )
         equipment_usage_data = fetch_backstage2_raw_data(
-            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage"
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "equipmentUsage", "bookingId"
         )
         time_report_data = fetch_backstage2_raw_data(
-            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports"
+            BACKSTAGE2_ANALYTICS_ENDPOINT_PREFIX + "timeReports", "bookingId"
         )
         push_data_to_big_query(booking_data, BIG_QUERY_DATASET_ID, "booking", credentials_path)
         push_data_to_big_query(equipment_usage_data, BIG_QUERY_DATASET_ID, "equipmentUsage", credentials_path)
@@ -221,7 +307,8 @@ def list_and_export_sheets_csv(folder_id, credentials_path="credentials.json"):
             )
             csv_data = request.execute()
             csv_exports[name] = csv_data  # Keep as bytes
-        except Exception:
+        except Exception as e:
+            print(e)
             csv_exports[name] = None
     return csv_exports
 

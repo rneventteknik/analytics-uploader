@@ -10,7 +10,7 @@ WITH booking AS (
 )
 
 SELECT
-    *,
+    eu.*,
     -- For fixed price equipment, calculate ratio of the fixed price this unit contributes with.
     -- For ordinary priced equipment, use the total_price 
     CASE
